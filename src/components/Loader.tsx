@@ -11,17 +11,16 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 	const loaderRef = useRef<HTMLDivElement>(null);
 	const progressRef = useRef<HTMLDivElement>(null);
 	const progressNumberRef = useRef<HTMLSpanElement>(null);
-	const logoRef = useRef<HTMLDivElement>(null);
 	const particlesRef = useRef<HTMLDivElement[]>([]);
 
 	useEffect(() => {
 		const ctx = gsap.context(() => {
-			// Create floating particles
 			const container = loaderRef.current;
 			if (!container) return;
 
 			particlesRef.current = [];
 
+			// Create floating particles
 			for (let i = 0; i < 12; i++) {
 				const particle = document.createElement("div");
 				particle.className = "loader-particle";
@@ -39,24 +38,13 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 			// Main loading timeline
 			const tl = gsap.timeline();
 
-			// Initial entrance animation
-			tl.to(logoRef.current, {
+			tl.to(particlesRef.current, {
 				scale: 1,
-				rotation: 360,
-				duration: 1.5,
-				ease: "back.out(1.7)",
+				opacity: 0.6,
+				duration: 1,
+				stagger: 0.1,
+				ease: "power2.out",
 			})
-				.to(
-					particlesRef.current,
-					{
-						scale: 1,
-						opacity: 0.6,
-						duration: 1,
-						stagger: 0.1,
-						ease: "power2.out",
-					},
-					"-=1",
-				)
 				.to(progressRef.current, {
 					width: "100%",
 					duration: 2.5,
@@ -79,12 +67,6 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 					stagger: 0.05,
 					ease: "power2.in",
 				})
-				.to(logoRef.current, {
-					scale: 1.2,
-					opacity: 0,
-					duration: 0.8,
-					ease: "power2.in",
-				})
 				.to(loaderRef.current, {
 					opacity: 0,
 					duration: 0.5,
@@ -101,10 +83,9 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 	return (
 		<div ref={loaderRef} className="loader-container">
 			<div className="loader-content">
-				{/* Animated Logo/Text */}
-				<div ref={logoRef} className="loader-logo">
+				{/* Static Logo */}
+				<div className="loader-logo">
 					<div className="logo-wrapper">
-						
 						<QueryoLogo size={64} className="logo-text" />
 					</div>
 				</div>
@@ -159,7 +140,6 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 				.loader-content {
 					text-align: center;
 					z-index: 10;
-					
 					padding: 3rem 2.5rem;
 					border-radius: 24px;
 					box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1),
@@ -167,11 +147,11 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 						inset 0 1px 0 rgba(255, 255, 255, 0.6);
 					backdrop-filter: blur(20px);
 					border: 1px solid rgba(255, 255, 255, 0.9);
+					animation: gentleFloat 6s ease-in-out infinite;
 				}
 
 				.loader-logo {
 					margin-bottom: 2.5rem;
-					transform: scale(0);
 				}
 
 				.logo-wrapper {
@@ -279,11 +259,6 @@ const Loader: React.FC<LoaderProps> = ({ onComplete }) => {
 						opacity: 0;
 						transform: translateY(0);
 					}
-				}
-
-				/* Subtle floating animation for the container */
-				.loader-content {
-					animation: gentleFloat 6s ease-in-out infinite;
 				}
 
 				@keyframes gentleFloat {

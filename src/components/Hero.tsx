@@ -429,92 +429,51 @@ const MultiLLMHero = ({
 			camera: THREE.PerspectiveCamera,
 			renderer: THREE.WebGLRenderer;
 		const aiClusters: any[] = [];
-		const connectionLines: THREE.Line[] = [];
 		let centralHub: THREE.Group;
+		let solarSystemGroup: THREE.Group;
 		let animationFrameId: number;
-		let mouseX = 0,
-			mouseY = 0;
-		let scrollY = 0;
-		let targetCameraZ = 15;
 
-		// Responsive scaling factors based on screen size
+		// ============ FURTHER REDUCED SCALE ============
 		const getResponsiveScale = () => {
 			const width = window.innerWidth;
-			if (width < 640) return 0.8; // mobile
-			if (width < 1024) return 0.8; // tablet
-			return 1; // desktop
+			if (width < 640) return 0.18; // Even smaller for mobile
+			if (width < 1024) return 0.25; // Smaller for tablet
+			return 0.32; // More compact for desktop half-width
 		};
 
 		const getCentralHubScale = () => {
 			const width = window.innerWidth;
-			if (width < 640) return 0.27; // mobile
-			if (width < 1024) return 0.8; // tablet
-			return 1; // desktop
+			if (width < 640) return 0.09; // Much smaller
+			if (width < 1024) return 0.11; // Smaller
+			return 0.14; // More compact
 		};
 
-		const getHubPosition = () => {
-			const width = window.innerWidth;
-			if (width < 640) {
-				return { x: 0, y: -2.5, z: 0 }; // Mobile - small adjustment
-			}
-			if (width < 1024) {
-				return { x: -1.7, y: -1.4, z: 0 }; // Tablet - medium adjustment
-			}
-			return { x: 3, y: 3, z: 0 }; // Desktop - larger adjustment
-		};
-
-		// Add movement boundaries based on device size
-		const getMovementBoundaries = () => {
-			const width = window.innerWidth;
-			if (width < 640) {
-				return { x: 1.0, y: 0.2, z: 0.2 }; // Mobile - moderate movement
-			}
-			if (width < 1024) {
-				return { x: 0.2, y: 0.2, z: 0.2 }; // Tablet - less movement
-			}
-			return { x: 0.2, y: 0.2, z: 0.2 }; // Desktop - minimal movement
-		};
-
-		// Add safe zones to avoid text areas (adjust based on your layout)
-		const getSafeZones = () => {
-			const width = window.innerWidth;
-			// These values represent how close clusters can get to screen edges
-			// Adjust based on where your text is positioned
-			if (width < 640) {
-				return { right: 3, left: 3, top: 2, bottom: 2 };
-			}
-			if (width < 1024) {
-				return { right: 4, left: 4, top: 3, bottom: 3 };
-			}
-			return { right: 8, left: 6, top: 3, bottom: 4 }; // Desktop - more restriction on right where text might be
-		};
-
-		const getResponsiveCameraZ = () => {
-			const width = window.innerWidth;
-			if (width < 640) return 22; // mobile - pull back more
-			if (width < 1024) return 18; // tablet
-			return 15; // desktop
-		};
-
+		// ============ FURTHER REDUCED: Even fewer particles ============
 		const getResponsiveParticleCount = () => {
 			const width = window.innerWidth;
-			if (width < 640) return { cluster: 8, ambient: 200, hub: 100 }; // mobile - reduce particles
-			if (width < 1024) return { cluster: 12, ambient: 400, hub: 200 }; // tablet
-			return { cluster: 6, ambient: 700, hub: 400 }; // desktop
+			if (width < 640) return { cluster: 3, ambient: 30, hub: 20 };
+			if (width < 1024) return { cluster: 4, ambient: 45, hub: 30 };
+			return { cluster: 6, ambient: 60, hub: 40 };
 		};
 
+		// ============ ADJUSTED: Solar system position ============
+		const getSolarSystemPosition = () => {
+			const width = window.innerWidth;
+			if (width < 1024) return { x: 0, y: 0, z: 0 };
+			return { x: 0.67, y: 2.3, z: -0.35 };
+		};
+
+		
+
 		let responsiveScale = getResponsiveScale();
-		let responsiveCameraZ = getResponsiveCameraZ();
 		let particleCounts = getResponsiveParticleCount();
 
-		// Function to create circular particle texture
 		const createParticleTexture = () => {
 			const canvas = document.createElement("canvas");
 			canvas.width = 32;
 			canvas.height = 32;
 			const context = canvas.getContext("2d")!;
 
-			// Create circular gradient for smooth circular particles
 			const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
 			gradient.addColorStop(0, "rgba(255,255,255,1)");
 			gradient.addColorStop(0.4, "rgba(255,255,255,0.8)");
@@ -530,44 +489,48 @@ const MultiLLMHero = ({
 		const init = () => {
 			scene = new THREE.Scene();
 
+			// ============ ADJUSTED: Even closer camera ============
 			camera = new THREE.PerspectiveCamera(
-				70,
+				45,
 				canvas.offsetWidth / canvas.offsetHeight,
 				0.1,
 				1000,
 			);
-			// Add responsive camera X offset to shift view right on desktop
-			const getCameraXOffset = () => {
-				const width = window.innerWidth;
-				if (width < 768) return 0; // mobile - keep centered
-				if (width < 1024) return 10; // tablet - slight shift
-				return -10; // desktop - shift right (increase to move hub more left visually)
-			};
 
-			camera.position.set(getCameraXOffset(), 0, responsiveCameraZ);
-			targetCameraZ = responsiveCameraZ;
+			camera.position.set(0, 5, 0); // Reduced from 6 to 5
+			camera.lookAt(0, 0, 0);
 
 			renderer = new THREE.WebGLRenderer({
 				canvas,
 				alpha: true,
-				antialias: window.innerWidth > 640, // Disable antialiasing on mobile for performance
+				antialias: window.innerWidth > 640,
 			});
 			renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
 			renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 			renderer.setClearColor(0x000000, 0);
 
-			// Create particle texture once for reuse
 			const particleTexture = createParticleTexture();
 
-			// AI Categories with specific models - scaled positions
+			// ============ CREATE PARENT GROUP ============
+			solarSystemGroup = new THREE.Group();
+			const systemPosition = getSolarSystemPosition();
+			solarSystemGroup.position.set(
+				systemPosition.x,
+				systemPosition.y,
+				systemPosition.z,
+			);
+			scene.add(solarSystemGroup);
+
+			// ============ SIGNIFICANTLY SMALLER ORBITS ============
 			const aiCategories = [
 				{
 					name: "Chat AI",
 					color: 0x3b82f6,
-					position: {
-						x: -3 * responsiveScale, // Reduced from -6
-						y: 3 * responsiveScale, // Reduced from 4
-						z: -2 * responsiveScale,
+					orbit: {
+						radiusX: 0.8 * responsiveScale, // Much smaller orbits
+						radiusZ: 0.65 * responsiveScale,
+						speed: 0.3 + Math.random() * 0.3,
+						initialAngle: Math.random() * Math.PI * 2,
 					},
 					models: ["GPT-4", "Claude", "Gemini", "LLaMA"],
 					icon: MessageSquare,
@@ -575,17 +538,23 @@ const MultiLLMHero = ({
 				{
 					name: "Image AI",
 					color: 0x10b981,
-					position: { x: 9 * responsiveScale, y: 5 * responsiveScale, z: -0.5 },
+					orbit: {
+						radiusX: 1.4 * responsiveScale, // Reduced from 2.0
+						radiusZ: 1.1 * responsiveScale, // Reduced from 1.6
+						speed: 0.3 + Math.random() * 0.3,
+						initialAngle: Math.random() * Math.PI * 2,
+					},
 					models: ["DALL-E", "Midjourney", "Stable Diff", "Flux"],
 					icon: Image,
 				},
 				{
 					name: "Audio AI",
 					color: 0x8b5cf6,
-					position: {
-						x: -1 * responsiveScale,
-						y: -1 * responsiveScale,
-						z: 1 * responsiveScale,
+					orbit: {
+						radiusX: 1.1 * responsiveScale, // Reduced from 1.6
+						radiusZ: 0.9 * responsiveScale, // Reduced from 1.3
+						speed: 0.3 + Math.random() * 0.3,
+						initialAngle: Math.random() * Math.PI * 2,
 					},
 					models: ["ElevenLabs", "Whisper", "Suno", "MusicGen"],
 					icon: Volume2,
@@ -593,83 +562,95 @@ const MultiLLMHero = ({
 				{
 					name: "Video AI",
 					color: 0xec4899,
-					position: {
-						x: 7 * responsiveScale,
-						y: -2 * responsiveScale,
-						z: -1 * responsiveScale,
+					orbit: {
+						radiusX: 1.8 * responsiveScale, // Reduced from 2.6
+						radiusZ: 1.5 * responsiveScale, // Reduced from 2.1
+						speed: 0.3 + Math.random() * 0.3,
+						initialAngle: Math.random() * Math.PI * 2,
 					},
 					models: ["Sora", "Runway", "Pika", "Luma"],
 					icon: Video,
 				},
-				
+				{
+					name: "Code AI",
+					color: 0xf59e0b,
+					orbit: {
+						radiusX: 2.2 * responsiveScale, // Reduced from 3.2
+						radiusZ: 1.8 * responsiveScale, // Reduced from 2.6
+						speed: 0.3 + Math.random() * 0.3,
+						initialAngle: Math.random() * Math.PI * 2,
+					},
+					models: ["Copilot", "Cursor", "Cody", "Tabnine"],
+					icon: Code,
+				},
 			];
 
-			// Create AI Clusters with floating particles
+			// ============ EVEN SMALLER CLUSTERS ============
 			aiCategories.forEach((category) => {
 				const clusterGroup = new THREE.Group();
-				clusterGroup.position.set(
-					category.position.x,
-					category.position.y,
-					category.position.z,
-				);
+
+				const angle = category.orbit.initialAngle;
+				const x = category.orbit.radiusX * Math.cos(angle);
+				const z = category.orbit.radiusZ * Math.sin(angle);
+				const y = 0;
+
+				clusterGroup.position.set(x, y, z);
+
 				clusterGroup.userData = {
-					basePosition: { ...category.position },
-					targetPosition: { ...category.position },
-					chaosOffset: { x: 0, y: 0, z: 0 },
+					orbit: category.orbit,
+					currentAngle: angle,
 				};
 
-				// Main cluster sphere (represents the category) - scaled size
+				// ============ MUCH SMALLER CLUSTER SPHERES ============
 				const sphereGeometry = new THREE.SphereGeometry(
-					0.6 * responsiveScale,
-					32,
-					32,
+					0.18 * responsiveScale, // Reduced from 0.25
+					34, // Even fewer segments
+					34,
 				);
 				const sphereMaterial = new THREE.MeshBasicMaterial({
 					color: category.color,
 					transparent: true,
-					opacity: 0.7,
+					opacity: 0.8,
 					wireframe: true,
 				});
 				const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
 				clusterGroup.add(sphere);
 
-				// Inner solid sphere for depth
 				const innerSphereGeo = new THREE.SphereGeometry(
-					0.3 * responsiveScale,
-					16,
-					16,
+					0.09 * responsiveScale, // Reduced from 0.12
+					8,
+					8,
 				);
 				const innerSphereMat = new THREE.MeshBasicMaterial({
 					color: category.color,
 					transparent: true,
-					opacity: 0.4,
+					opacity: 0.5,
 				});
 				const innerSphere = new THREE.Mesh(innerSphereGeo, innerSphereMat);
 				clusterGroup.add(innerSphere);
 
-				// Glow effect - larger and more visible
 				const glowGeometry = new THREE.SphereGeometry(
-					0.7 * responsiveScale,
-					32,
-					32,
+					0.22 * responsiveScale, // Reduced from 0.3
+					12,
+					12,
 				);
 				const glowMaterial = new THREE.MeshBasicMaterial({
 					color: category.color,
 					transparent: true,
-					opacity: 0.3,
+					opacity: 0.4,
 				});
 				const glow = new THREE.Mesh(glowGeometry, glowMaterial);
 				clusterGroup.add(glow);
 
-				// Orbiting particles (individual AI models) - responsive count
-				const particleCount = category.models.length * particleCounts.cluster;
+				// ============ FEWER PARTICLES ============
+				const particleCount = particleCounts.cluster;
 				const positions = new Float32Array(particleCount * 3);
 				const velocities = new Float32Array(particleCount * 3);
 				const colors = new Float32Array(particleCount * 3);
 				const color = new THREE.Color(category.color);
 
 				for (let i = 0; i < particleCount; i++) {
-					const radius = (1.5 + Math.random() * 2) * responsiveScale;
+					const radius = (0.6 + Math.random() * 0.9) * responsiveScale; // Smaller particle clouds
 					const theta = Math.random() * Math.PI * 2;
 					const phi = Math.random() * Math.PI;
 
@@ -677,12 +658,11 @@ const MultiLLMHero = ({
 					positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
 					positions[i * 3 + 2] = radius * Math.cos(phi);
 
-					// Random velocities for chaotic motion - scaled
-					velocities[i * 3] = (Math.random() - 0.5) * 0.02 * responsiveScale;
+					velocities[i * 3] = (Math.random() - 0.5) * 0.006 * responsiveScale;
 					velocities[i * 3 + 1] =
-						(Math.random() - 0.5) * 0.02 * responsiveScale;
+						(Math.random() - 0.5) * 0.006 * responsiveScale;
 					velocities[i * 3 + 2] =
-						(Math.random() - 0.5) * 0.02 * responsiveScale;
+						(Math.random() - 0.5) * 0.006 * responsiveScale;
 
 					colors[i * 3] = color.r;
 					colors[i * 3 + 1] = color.g;
@@ -700,22 +680,20 @@ const MultiLLMHero = ({
 				);
 
 				const particleMaterial = new THREE.PointsMaterial({
-					size: 0.06 * responsiveScale,
+					size: 0.015 * responsiveScale, // Smaller particles
 					vertexColors: true,
 					transparent: true,
-					opacity: 0.9,
+					opacity: 0.8,
 					blending: THREE.AdditiveBlending,
-					map: particleTexture, // ADDED: Circular texture for particles
-					alphaTest: 0.1, // ADDED: Better transparency handling
+					map: particleTexture,
+					alphaTest: 0.1,
 				});
 
 				const particles = new THREE.Points(particleGeometry, particleMaterial);
 				particles.userData = { velocities };
 				clusterGroup.add(particles);
 
-				scene.add(clusterGroup);
-
-				const movementBoundaries = getMovementBoundaries();
+				solarSystemGroup.add(clusterGroup);
 
 				aiClusters.push({
 					group: clusterGroup,
@@ -724,133 +702,128 @@ const MultiLLMHero = ({
 					glow,
 					particles,
 					color: category.color,
-					basePosition: { ...category.position },
-					rotationSpeed: 0.003 + Math.random() * 0.005,
-					// SIGNIFICANTLY REDUCED movement for all devices, especially desktop
-					chaosAmplitude:
-						(0.3 + Math.random() * 0.2) *
-						responsiveScale *
-						movementBoundaries.x,
-					movementBounds: movementBoundaries, // Add bounds to each cluster
+					orbit: category.orbit,
+					rotationSpeed: 0.002 + Math.random() * 0.003,
 				});
 			});
 
-			// Create chaotic connection lines between all clusters - animated
-			const lineMaterial = new THREE.LineBasicMaterial({
-				color: 0xff6b35,
-				transparent: true,
-				opacity: 0.2,
-				linewidth: 2,
+			// ============ SMALLER ORBIT PATHS ============
+			aiClusters.forEach((cluster) => {
+				const orbitGeometry = new THREE.EllipseCurve(
+					0,
+					0,
+					cluster.orbit.radiusX,
+					cluster.orbit.radiusZ,
+					0,
+					2 * Math.PI,
+					false,
+					0,
+				);
+
+				const points = orbitGeometry.getPoints(80); // Fewer points
+				const orbitPoints = points.map(
+					(point) => new THREE.Vector3(point.x, 0, point.y),
+				);
+
+				// Create a smooth curve from the points
+				const curve = new THREE.CatmullRomCurve3(orbitPoints);
+
+				// Create tube geometry - much thicker than line
+				const tubeGeometry = new THREE.TubeGeometry(
+					curve,
+					80, // tubular segments (smoothness)
+					0.009 * responsiveScale, // tube radius - adjust this for thickness
+					8, // radial segments
+					false, // closed
+				);
+
+				const orbitMaterial = new THREE.MeshBasicMaterial({
+					color: cluster.color,
+					transparent: true,
+					opacity: 0.3, // Higher opacity for solid look
+					side: THREE.DoubleSide,
+				});
+
+				const orbitTube = new THREE.Mesh(tubeGeometry, orbitMaterial);
+				solarSystemGroup.add(orbitTube);
 			});
 
-			// Store hub reference for connections
-			let hubReference: THREE.Group;
-
-			for (let i = 0; i < aiClusters.length; i++) {
-				for (let j = i + 1; j < aiClusters.length; j++) {
-					const points = [
-						aiClusters[i].group.position.clone(),
-						aiClusters[j].group.position.clone(),
-					];
-					const geometry = new THREE.BufferGeometry().setFromPoints(points);
-					const line = new THREE.Line(geometry, lineMaterial);
-					line.userData = {
-						start: i,
-						end: j,
-						pulseOffset: Math.random() * Math.PI * 2,
-					};
-					scene.add(line);
-					connectionLines.push(line);
-				}
-			}
-
-			// Central Queryo Hub (unified solution) - scaled
+			// ============ SMALLER CENTRAL HUB ============
 			centralHub = new THREE.Group();
+			centralHub.position.set(0, 0, 0);
 
-			// CHANGED: Use responsive hub position
-			const hubPosition = getHubPosition();
 			const centralHubScale = getCentralHubScale();
 
-			centralHub.position.set(
-				hubPosition.x * responsiveScale,
-				hubPosition.y * responsiveScale,
-				hubPosition.z,
-			);
-
-			// Main hub sphere - larger
 			const hubGeometry = new THREE.SphereGeometry(
-				2.5 * centralHubScale,
-				64,
+				0.75 * centralHubScale, // Reduced from 1.0
+				64, // Fewer segments
 				64,
 			);
 
 			const hubMaterial = new THREE.MeshBasicMaterial({
 				color: 0xff6b35,
 				transparent: true,
-				opacity: 0.8,
+				opacity: 0.9,
 				wireframe: true,
 			});
 
 			const hubSphere = new THREE.Mesh(hubGeometry, hubMaterial);
-
 			centralHub.add(hubSphere);
 
-			// Inner solid hub
 			const hubInnerGeo = new THREE.SphereGeometry(
-				3.3 * centralHubScale,
-				32,
-				32,
+				0.95 * centralHubScale, // Reduced from 1.3
+				48,
+				48,
 			);
 			const hubInnerMat = new THREE.MeshBasicMaterial({
 				color: 0xff6b35,
 				transparent: true,
-				opacity: 0.3,
+				opacity: 0.4,
 			});
 			const hubInner = new THREE.Mesh(hubInnerGeo, hubInnerMat);
 			centralHub.add(hubInner);
 
-			// Hub glow - more prominent
 			const hubGlowGeometry = new THREE.SphereGeometry(
-				2.6 * centralHubScale,
-				32,
-				32,
+				0.8 * centralHubScale, // Reduced from 1.1
+				48,
+				48,
 			);
 			const hubGlowMaterial = new THREE.MeshBasicMaterial({
 				color: 0xffa500,
 				transparent: true,
-				opacity: 0.25,
+				opacity: 0.3,
 			});
 			const hubGlow = new THREE.Mesh(hubGlowGeometry, hubGlowMaterial);
 			centralHub.add(hubGlow);
 
-			// Orbiting rings around hub - more dynamic, scaled
-			const ringCount = window.innerWidth < 640 ? 3 : 4; // Fewer rings on mobile
+			// ============ SINGLE RING ============
+			const ringCount = 1;
 			for (let i = 0; i < ringCount; i++) {
 				const ringGeometry = new THREE.TorusGeometry(
-					(2 + i * 0.9) * centralHubScale,
-					0.05 * centralHubScale,
-					16,
-					100,
+					(0.6 + i * 0.3) * centralHubScale, // Smaller rings
+					0.015 * centralHubScale, // Thinner
+					6, // Fewer segments
+					60, // Fewer segments
 				);
 				const ringMaterial = new THREE.MeshBasicMaterial({
 					color: i % 2 === 0 ? 0xffa500 : 0xff6b35,
 					transparent: true,
-					opacity: 0.5,
+					opacity: 0.6,
 				});
 				const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-				ring.rotation.x = Math.PI / 2 + (i * Math.PI) / 8;
-				ring.rotation.y = (i * Math.PI) / 5;
+				ring.rotation.x = Math.PI / 2 + (i * Math.PI) / 6;
+				ring.rotation.y = (i * Math.PI) / 4;
 				ring.userData = { rotationSpeed: 0.001 * (i + 1) };
 				centralHub.add(ring);
 			}
 
-			// Hub particles - concentrated around center - responsive count
+			// ============ REDUCED HUB PARTICLES ============
 			const hubParticleCount = particleCounts.hub;
 			const hubParticlePos = new Float32Array(hubParticleCount * 3);
 			const hubParticleColors = new Float32Array(hubParticleCount * 3);
 
 			for (let i = 0; i < hubParticleCount; i++) {
-				const radius = (2 + Math.random() * 2) * responsiveScale;
+				const radius = (0.6 + Math.random() * 0.8) * responsiveScale; // Tighter particle field
 				const theta = Math.random() * Math.PI * 2;
 				const phi = Math.random() * Math.PI;
 
@@ -877,37 +850,37 @@ const MultiLLMHero = ({
 			);
 
 			const hubParticleMat = new THREE.PointsMaterial({
-				size: 0.04 * responsiveScale,
+				size: 0.012 * responsiveScale, // Smaller particles
 				vertexColors: true,
 				transparent: true,
-				opacity: 0.8,
+				opacity: 0.7,
 				blending: THREE.AdditiveBlending,
-				map: particleTexture, // ADDED: Circular texture for particles
-				alphaTest: 0.1, // ADDED: Better transparency handling
+				map: particleTexture,
+				alphaTest: 0.1,
 			});
 
 			const hubParticles = new THREE.Points(hubParticleGeo, hubParticleMat);
 			centralHub.add(hubParticles);
 			centralHub.userData = { hubParticles };
 
-			scene.add(centralHub);
+			solarSystemGroup.add(centralHub);
 
-			// Ambient floating particles (chaos) - responsive count
+			// ============ REDUCED AMBIENT PARTICLES ============
 			const ambientCount = particleCounts.ambient;
 			const ambientPositions = new Float32Array(ambientCount * 3);
 			const ambientColors = new Float32Array(ambientCount * 3);
 			const ambientVelocities = new Float32Array(ambientCount * 3);
 
 			for (let i = 0; i < ambientCount; i++) {
-				ambientPositions[i * 3] = (Math.random() - 0.5) * 40 * responsiveScale;
+				ambientPositions[i * 3] = (Math.random() - 0.5) * 9 * responsiveScale; // Smaller area
 				ambientPositions[i * 3 + 1] =
-					(Math.random() - 0.5) * 40 * responsiveScale;
+					(Math.random() - 0.5) * 9 * responsiveScale;
 				ambientPositions[i * 3 + 2] =
-					(Math.random() - 0.5) * 30 * responsiveScale;
+					(Math.random() - 0.5) * 7 * responsiveScale;
 
-				ambientVelocities[i * 3] = (Math.random() - 0.5) * 0.02;
-				ambientVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.02;
-				ambientVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+				ambientVelocities[i * 3] = (Math.random() - 0.5) * 0.006;
+				ambientVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.006;
+				ambientVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.006;
 
 				const color = new THREE.Color();
 				color.setHSL(0.05 + Math.random() * 0.15, 0.8, 0.6);
@@ -927,13 +900,13 @@ const MultiLLMHero = ({
 			);
 
 			const ambientMaterial = new THREE.PointsMaterial({
-				size: 0.03 * responsiveScale,
+				size: 0.01 * responsiveScale, // Smaller ambient particles
 				vertexColors: true,
 				transparent: true,
-				opacity: 0.6,
+				opacity: 0.5,
 				blending: THREE.AdditiveBlending,
-				map: particleTexture, // ADDED: Circular texture for particles
-				alphaTest: 0.1, // ADDED: Better transparency handling
+				map: particleTexture,
+				alphaTest: 0.1,
 			});
 
 			const ambientParticles = new THREE.Points(
@@ -944,117 +917,59 @@ const MultiLLMHero = ({
 			scene.add(ambientParticles);
 		};
 
-		// NEW: Create connections from central hub to each cluster
-		const createHubConnections = () => {
-			aiClusters.forEach((cluster, index) => {
-				const points = [
-					centralHub.position.clone(), // Hub position
-					cluster.group.position.clone(), // Cluster position
-				];
-				const geometry = new THREE.BufferGeometry().setFromPoints(points);
-				const line = new THREE.Line(geometry, lineMaterial);
-				line.userData = {
-					start: "hub", // Mark as hub connection
-					end: index, // Cluster index
-					pulseOffset: Math.random() * Math.PI * 2,
-				};
-				scene.add(line);
-				connectionLines.push(line);
-			});
-		};
-
-		// Call this after central hub is fully created
-		createHubConnections();
-
+		// ============ ANIMATE FUNCTION ============
 		const animate = () => {
 			const time = Date.now() * 0.001;
 
-			// Animate AI clusters with chaotic motion
+			// Orbital motion
 			aiClusters.forEach((cluster, index) => {
-				// Chaotic rotation - different speeds for each component
-				cluster.particles.rotation.y += cluster.rotationSpeed;
-				cluster.particles.rotation.x += cluster.rotationSpeed * 0.1;
-				cluster.sphere.rotation.y -= cluster.rotationSpeed * 0.1;
-				cluster.sphere.rotation.z += cluster.rotationSpeed * 0.1;
+				cluster.group.userData.currentAngle += cluster.orbit.speed * 0.01;
+				const angle = cluster.group.userData.currentAngle;
 
-				// Update particle positions for chaotic movement
+				const x = cluster.orbit.radiusX * Math.cos(angle);
+				const z = cluster.orbit.radiusZ * Math.sin(angle);
+				const y = 0;
+
+				cluster.group.position.set(x, y, z);
+
+				cluster.particles.rotation.y += cluster.rotationSpeed;
+				cluster.sphere.rotation.y -= cluster.rotationSpeed * 0.5;
+
+				// Update particle positions within cluster
 				const positions = cluster.particles.geometry.attributes.position.array;
 				const velocities = cluster.particles.userData.velocities;
 
-				
+				for (let i = 0; i < positions.length; i += 3) {
+					positions[i] += velocities[i];
+					positions[i + 1] += velocities[i + 1];
+					positions[i + 2] += velocities[i + 2];
 
-				// Enhanced pulsing effect with chaos
-				const pulse = Math.sin(time * 2 + index) * 0.15 + 1;
-				const chaosScale = Math.sin(time * 3 + index * 0.5) * 0.1;
-				cluster.sphere.scale.setScalar(pulse + chaosScale);
-				cluster.innerSphere.scale.setScalar((pulse + chaosScale) * 0.8);
-				cluster.glow.scale.setScalar(pulse * 1.3);
+					const distance = Math.sqrt(
+						positions[i] ** 2 + positions[i + 1] ** 2 + positions[i + 2] ** 2,
+					);
 
-				const safeZones = getSafeZones();
-				const movementBounds = cluster.movementBounds;
-
-				
-
-				/// Apply mouse influence - significantly reduced on desktop
-				const mouseInfluenceMultiplier =
-					window.innerWidth < 640 ? 0.8 : window.innerWidth < 1024 ? 1.2 : 0.6;
-
-				const mouseInfluenceX =
-					mouseX * mouseInfluenceMultiplier * (index % 2 === 0 ? 1 : -1);
-				const mouseInfluenceY =
-					mouseY *
-					(mouseInfluenceMultiplier * 0.66) *
-					(index % 2 === 0 ? 1 : -1);
-
-				// Calculate new position
-				
-			});
-
-			// Update connection lines - dynamic positioning and pulsing opacity
-			connectionLines.forEach((line) => {
-				// Check if this is a hub connection or cluster-to-cluster connection
-				if (line.userData.start === "hub") {
-					// Hub to cluster connection
-					const cluster = aiClusters[line.userData.end];
-					const positions = line.geometry.attributes.position.array;
-
-					// Start point: hub position
-					positions[0] = centralHub.position.x;
-					positions[1] = centralHub.position.y;
-					positions[2] = centralHub.position.z;
-
-					// End point: cluster position
-					positions[3] = cluster.group.position.x;
-					positions[4] = cluster.group.position.y;
-					positions[5] = cluster.group.position.z;
-				} else {
-					// Cluster to cluster connection (existing logic)
-					const startCluster = aiClusters[line.userData.start];
-					const endCluster = aiClusters[line.userData.end];
-
-					const positions = line.geometry.attributes.position.array;
-					positions[0] = startCluster.group.position.x;
-					positions[1] = startCluster.group.position.y;
-					positions[2] = startCluster.group.position.z;
-					positions[3] = endCluster.group.position.x;
-					positions[4] = endCluster.group.position.y;
-					positions[5] = endCluster.group.position.z;
+					if (
+						distance > 1.1 * responsiveScale ||
+						distance < 0.4 * responsiveScale
+					) {
+						velocities[i] *= -1;
+						velocities[i + 1] *= -1;
+						velocities[i + 2] *= -1;
+					}
 				}
+				cluster.particles.geometry.attributes.position.needsUpdate = true;
 
-				line.geometry.attributes.position.needsUpdate = true;
-
-				// Pulsing opacity
-				const pulse =
-					Math.sin(time * 2 + line.userData.pulseOffset) * 0.5 + 0.5;
-				(line.material as THREE.LineBasicMaterial).opacity = 0.1 + pulse * 0.2;
+				// Subtle pulsing effect
+				const pulse = Math.sin(time * 1.5 + index) * 0.05 + 1;
+				cluster.sphere.scale.setScalar(pulse);
+				cluster.glow.scale.setScalar(pulse * 1.1);
 			});
 
-			// Rotate central hub with multiple axis rotation
-			centralHub.rotation.y += 0.004;
-			centralHub.rotation.x += 0.002;
-			centralHub.rotation.z += 0.001;
+			// Central hub animation
+			centralHub.rotation.y += 0.003;
+			centralHub.rotation.x += 0.001;
 
-			// Rotate individual rings independently
+			// Rotate individual rings
 			centralHub.children.forEach((child, i) => {
 				if (i > 2 && child.userData.rotationSpeed) {
 					child.rotation.z +=
@@ -1064,17 +979,14 @@ const MultiLLMHero = ({
 
 			// Hub particle rotation
 			if (centralHub.userData.hubParticles) {
-				centralHub.userData.hubParticles.rotation.y += 0.002;
-				centralHub.userData.hubParticles.rotation.x -= 0.001;
+				centralHub.userData.hubParticles.rotation.y += 0.001;
 			}
 
-			// Reduced hub pulse, especially on desktop
-			const pulseReduction = window.innerWidth >= 1024 ? 0.5 : 1;
-			const hubPulse = (Math.sin(time * 1.5) * 0.08 + 1) * pulseReduction; // Reduced amplitude
-			const scrollInfluence = 1 + scrollY * 0.00005; // Reduced scroll influence
-			centralHub.scale.setScalar(hubPulse * scrollInfluence);
+			// Very subtle hub pulse
+			const hubPulse = Math.sin(time) * 0.03 + 1;
+			centralHub.scale.setScalar(hubPulse);
 
-			// Animate ambient particles with chaotic motion
+			// Animate ambient particles
 			scene.children.forEach((child) => {
 				if (child instanceof THREE.Points && child.userData.velocities) {
 					const positions = child.geometry.attributes.position.array;
@@ -1085,94 +997,36 @@ const MultiLLMHero = ({
 						positions[i + 1] += velocities[i + 1];
 						positions[i + 2] += velocities[i + 2];
 
-						// Wrap around boundaries - scaled
-						if (Math.abs(positions[i]) > 20 * responsiveScale)
+						if (Math.abs(positions[i]) > 4.5 * responsiveScale)
 							velocities[i] *= -1;
-						if (Math.abs(positions[i + 1]) > 20 * responsiveScale)
+						if (Math.abs(positions[i + 1]) > 4.5 * responsiveScale)
 							velocities[i + 1] *= -1;
-						if (Math.abs(positions[i + 2]) > 15 * responsiveScale)
+						if (Math.abs(positions[i + 2]) > 3.5 * responsiveScale)
 							velocities[i + 2] *= -1;
 					}
 					child.geometry.attributes.position.needsUpdate = true;
 				}
 			});
 
-			// Enhanced camera movement with smooth easing and scroll - adjusted for mobile
-			const cameraMultiplier = window.innerWidth < 640 ? 1 : 2;
-			const targetX = mouseX * cameraMultiplier;
-			const targetY = -mouseY * cameraMultiplier;
-			camera.position.x += (targetX - camera.position.x) * 0.05;
-			camera.position.y += (targetY - camera.position.y) * 0.05;
-
-			// Zoom based on scroll
-			camera.position.z += (targetCameraZ - camera.position.z) * 0.05;
-
-			const getLookAtOffset = () => {
-				const width = window.innerWidth;
-				if (width < 768) return 0; // mobile - look at center
-				if (width < 1024) return -1.5; // tablet - slight offset
-				return -3; // desktop - look left (negative = left, positive = right)
-			};
-
-			camera.lookAt(getLookAtOffset(), 0, 0);
-
-			// Dynamic scene rotation - significantly reduced on desktop
-			const rotationMultiplier =
-				window.innerWidth < 640 ? 0.5 : window.innerWidth < 1024 ? 0.8 : 0.3;
-			scene.rotation.y += (0.0005 + mouseX * 0.0003) * rotationMultiplier; // Reduced base rotation
-			scene.rotation.x += mouseY * 0.0002 * rotationMultiplier; // Reduced mouse influence
+			// Camera remains fixed
+			camera.lookAt(0, 0, 0);
 
 			renderer.render(scene, camera);
 			animationFrameId = requestAnimationFrame(animate);
 		};
 
-		const handleMouseMove = (event: MouseEvent) => {
-			mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-			mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-		};
-
-		// Touch support for mobile
-		const handleTouchMove = (event: TouchEvent) => {
-			if (event.touches.length > 0) {
-				mouseX = (event.touches[0].clientX / window.innerWidth) * 2 - 1;
-				mouseY = -(event.touches[0].clientY / window.innerHeight) * 2 + 1;
-			}
-		};
-
-		const handleScroll = () => {
-			scrollY = window.scrollY;
-			// Zoom in/out based on scroll (subtle effect)
-			const baseZ = getResponsiveCameraZ();
-			targetCameraZ = baseZ - scrollY * 0.005;
-			targetCameraZ = Math.max(baseZ - 5, Math.min(baseZ + 5, targetCameraZ));
-		};
-
 		const handleResize = () => {
 			if (!canvas || !canvas.offsetWidth) return;
 
-			// Update responsive values
 			responsiveScale = getResponsiveScale();
-			responsiveCameraZ = getResponsiveCameraZ();
 			particleCounts = getResponsiveParticleCount();
 
-			// Update camera
 			camera.aspect = canvas.offsetWidth / canvas.offsetHeight;
 			camera.updateProjectionMatrix();
-			camera.position.z = responsiveCameraZ;
-			targetCameraZ = responsiveCameraZ;
 
-			// Update renderer
 			renderer.setSize(canvas.offsetWidth, canvas.offsetHeight);
-
-			// Update antialiasing setting
-			if (window.innerWidth <= 640 && renderer.capabilities.maxSamples > 0) {
-				// Mobile - consider disabling for performance
-			}
 		};
 
-		window.addEventListener("mousemove", handleMouseMove);
-		window.addEventListener("touchmove", handleTouchMove, { passive: true });
-		window.addEventListener("scroll", handleScroll, { passive: true });
 		window.addEventListener("resize", handleResize);
 
 		try {
@@ -1183,14 +1037,13 @@ const MultiLLMHero = ({
 		}
 
 		return () => {
-			window.removeEventListener("mousemove", handleMouseMove);
-			window.addEventListener("touchmove", handleTouchMove);
-			window.removeEventListener("scroll", handleScroll);
 			window.removeEventListener("resize", handleResize);
 			if (animationFrameId) cancelAnimationFrame(animationFrameId);
 			if (renderer) renderer.dispose();
 		};
 	}, [isLoading]);
+
+	
 
 	return (
 		<div className="grain">
@@ -1409,7 +1262,7 @@ const MultiLLMHero = ({
 														{/* CTA Button */}
 														<div className="pt-1 sm:pt-2 flex justify-center lg:justify-start">
 															<button
-																className={`feature-cta group px-5 sm:px-6 lg:px-5 xl:px-6 py-2 sm:py-2.5 lg:py-2 xl:py-2.5 bg-linear-to-r ${feature.gradient} hover:shadow-2xl text-white rounded-lg font-semibold text-sm sm:text-base lg:text-sm xl:text-base transition-all duration-300 flex items-center gap-2 shadow-lg min-h-[36px] lg:min-h-[34px] xl:min-h-[38px] transform-gpu`}
+																className={`feature-cta group px-5 sm:px-6 lg:px-5 xl:px-6 py-2 sm:py-2.5 lg:py-2 xl:py-2.5 bg-linear-to-r ${feature.gradient} hover:shadow-2xl text-white rounded-lg font-semibold text-sm sm:text-base lg:text-sm xl:text-base transition-all duration-300 flex items-center gap-2 shadow-lg min-h-9 lg:min-h-[34px] xl:min-h-[38px] transform-gpu`}
 															>
 																<span>
 																	{feature.status === "Live"

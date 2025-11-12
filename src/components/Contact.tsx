@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Mail, User, MessageSquare, Send, ArrowRight } from "lucide-react";
+import { X, Mail, User, MessageSquare, Send } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function ContactModal() {
@@ -59,7 +59,7 @@ export default function ContactModal() {
 		}
 	};
 
-	const handleSubmit = (e) => {
+	const handleSubmit = (e ) => {
 		e.preventDefault();
 		// Add your API call here
 		console.log("Form submitted:", formData);
@@ -139,7 +139,7 @@ export default function ContactModal() {
 						{/* Close Button */}
 						<button
 							onClick={closeModal}
-							className="absolute top-5 right-5 z-[9999] p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group cursor-pointer"
+							className="absolute top-5 right-5 z-9999 p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group cursor-pointer"
 							aria-label="Close modal"
 						>
 							<X
@@ -162,8 +162,8 @@ export default function ContactModal() {
 									Get in Touch
 								</h2>
 								<p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-									Have a question or feedback? We'd love to hear from you. Fill
-									out the form below and we'll get back to you shortly.
+									Have a question or feedback? We&#39;d love to hear from you. Fill
+									out the form below and we&#39;ll get back to you shortly.
 								</p>
 							</div>
 
