@@ -24,6 +24,7 @@ import {
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Loader from "./Loader";
+import { log } from "console";
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -31,6 +32,41 @@ interface Position {
 	x: number;
 	y: number;
 }
+
+const AI_LOGOS = {
+	chat: {
+		gpt4: "/logos/chat/gpt4.png", // or use: "https://cdn.openai.com/..."
+		claude: "/logos/chat/claude.png",
+		gemini: "/logos/chat/gemini.png",
+		llama: "/logos/deepseek-ai.svg",
+		mistral: "/logos/mistral-ai.png",
+	},
+	image: {
+		dalle: "/logos/image/dalle.png",
+		midjourney: "/logos/image/midjourney.png",
+		stablediff: "/logos/image/stable-diffusion.png",
+		flux: "/logos/image/flux.png",
+	},
+	audio: {
+		elevenlabs: "/logos/audio/elevenlabs.png",
+		whisper: "/logos/audio/whisper.png",
+		suno: "/logos/audio/suno.png",
+		musicgen: "/logos/audio/musicgen.png",
+	},
+	video: {
+		sora: "/logos/video/sora.png",
+		runway: "/logos/video/runway.png",
+		pika: "/logos/video/pika.png",
+		luma: "/logos/video/luma.png",
+	},
+	code: {
+		copilot: "/logos/code/copilot.png",
+		cursor: "/logos/code/cursor.png",
+		cody: "/logos/code/cody.png",
+		tabnine: "/logos/code/tabnine.png",
+	},
+	hub: "/logos/queryo-logo.png",
+};
 
 const features = [
 	{
@@ -433,22 +469,21 @@ const MultiLLMHero = ({
 		let solarSystemGroup: THREE.Group;
 		let animationFrameId: number;
 
-		// ============ FURTHER REDUCED SCALE ============
+		// ============ RESPONSIVE SCALE ============
 		const getResponsiveScale = () => {
 			const width = window.innerWidth;
-			if (width < 640) return 0.18; // Even smaller for mobile
-			if (width < 1024) return 0.25; // Smaller for tablet
-			return 0.32; // More compact for desktop half-width
+			if (width < 640) return 0.3;
+			if (width < 1024) return 0.4;
+			return 0.5;
 		};
 
 		const getCentralHubScale = () => {
 			const width = window.innerWidth;
-			if (width < 640) return 0.09; // Much smaller
-			if (width < 1024) return 0.11; // Smaller
-			return 0.14; // More compact
+			if (width < 640) return 0.5;
+			if (width < 1024) return 0.6;
+			return 0.7;
 		};
 
-		// ============ FURTHER REDUCED: Even fewer particles ============
 		const getResponsiveParticleCount = () => {
 			const width = window.innerWidth;
 			if (width < 640) return { cluster: 3, ambient: 30, hub: 20 };
@@ -456,14 +491,11 @@ const MultiLLMHero = ({
 			return { cluster: 6, ambient: 60, hub: 40 };
 		};
 
-		// ============ ADJUSTED: Solar system position ============
 		const getSolarSystemPosition = () => {
 			const width = window.innerWidth;
 			if (width < 1024) return { x: 0, y: 0, z: 0 };
-			return { x: 0.67, y: 2.3, z: -0.35 };
+			return { x: 1.5, y: -3, z: -0.8 };
 		};
-
-		
 
 		let responsiveScale = getResponsiveScale();
 		let particleCounts = getResponsiveParticleCount();
@@ -486,10 +518,96 @@ const MultiLLMHero = ({
 			return texture;
 		};
 
-		const init = () => {
+		// ============ LOGO LOADING UTILITIES ============
+		const logoTextures = new Map<string, THREE.Texture>();
+		const textureLoader = new THREE.TextureLoader();
+
+		const createTextTexture = (text: string, color: number): THREE.Texture => {
+			const canvas = document.createElement("canvas");
+			const context = canvas.getContext("2d")!;
+			canvas.width = 256;
+			canvas.height = 256;
+
+			// Background circle
+			context.fillStyle = `#${color.toString(16).padStart(6, "0")}`;
+			context.beginPath();
+			context.arc(128, 128, 100, 0, 2 * Math.PI);
+			context.fill();
+
+			// Text
+			context.fillStyle = "#000000";
+			context.font = "bold 48px Arial";
+			context.textAlign = "center";
+			context.textBaseline = "middle";
+			context.fillText(text.substring(0, 4), 128, 128);
+
+			return new THREE.CanvasTexture(canvas);
+		};
+
+		const loadLogoTexture = (path: string): Promise<THREE.Texture> => {
+			return new Promise((resolve, reject) => {
+				if (logoTextures.has(path)) {
+					resolve(logoTextures.get(path)!);
+					return;
+				}
+
+				textureLoader.load(
+					path,
+					(texture) => {
+						texture.minFilter = THREE.LinearMipmapLinearFilter;
+						texture.magFilter = THREE.LinearFilter;
+						texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+						// Handle both old and new Three.js versions
+						// @ts-ignore - Handle version differences
+						if (texture.colorSpace !== undefined) {
+							texture.colorSpace = THREE.SRGBColorSpace;
+						} else if ((texture as any).encoding !== undefined) {
+							(texture as any).encoding = (THREE as any).sRGBEncoding;
+						}
+
+						logoTextures.set(path, texture);
+						resolve(texture);
+					},
+					undefined,
+					(error) => {
+						console.warn(`Failed to load logo: ${path}`, error);
+						const fallbackTexture = createTextTexture(
+							path.split("/").pop()?.split(".")[0]?.toUpperCase() || "AI",
+							0xffffff,
+						);
+						logoTextures.set(path, fallbackTexture);
+						resolve(fallbackTexture);
+					},
+				);
+			});
+		};
+
+		const createLogoSprite = (
+			texture: THREE.Texture,
+			scale: number = 0.8,
+			isGlow: boolean = false,
+		): THREE.Sprite => {
+			const spriteMaterial = new THREE.SpriteMaterial({
+				map: texture,
+				transparent: true,
+				opacity: isGlow ? 0.06 : 1.0,
+				alphaTest: 0.01,
+				depthWrite: !isGlow,
+				depthTest: true,
+				sizeAttenuation: true,
+			});
+
+			const sprite = new THREE.Sprite(spriteMaterial);
+			sprite.scale.set(scale * responsiveScale, scale * responsiveScale, 1);
+			sprite.renderOrder = isGlow ? 0 : 10;
+
+			return sprite;
+		};
+
+		const init = async () => {
 			scene = new THREE.Scene();
 
-			// ============ ADJUSTED: Even closer camera ============
 			camera = new THREE.PerspectiveCamera(
 				45,
 				canvas.offsetWidth / canvas.offsetHeight,
@@ -497,7 +615,7 @@ const MultiLLMHero = ({
 				1000,
 			);
 
-			camera.position.set(0, 5, 0); // Reduced from 6 to 5
+			camera.position.set(0, 3.5, 0);
 			camera.lookAt(0, 0, 0);
 
 			renderer = new THREE.WebGLRenderer({
@@ -509,9 +627,13 @@ const MultiLLMHero = ({
 			renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 			renderer.setClearColor(0x000000, 0);
 
+			// Add ambient light for better visibility
+			const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+			scene.add(ambientLight);
+
 			const particleTexture = createParticleTexture();
 
-			// ============ CREATE PARENT GROUP ============
+			// Create parent group
 			solarSystemGroup = new THREE.Group();
 			const systemPosition = getSolarSystemPosition();
 			solarSystemGroup.position.set(
@@ -521,358 +643,305 @@ const MultiLLMHero = ({
 			);
 			scene.add(solarSystemGroup);
 
-			// ============ SIGNIFICANTLY SMALLER ORBITS ============
+			// ============ EQUALLY SPACED ORBITS ============
+			// Starting from 0.6 and incrementing by 0.25 for each orbit
+			const baseRadiusX = 0.6;
+			const baseRadiusZ = 0.5;
+			const radiusIncrement = 0.25;
+
 			const aiCategories = [
 				{
 					name: "Chat AI",
 					color: 0x3b82f6,
 					orbit: {
-						radiusX: 0.8 * responsiveScale, // Much smaller orbits
-						radiusZ: 0.65 * responsiveScale,
-						speed: 0.3 + Math.random() * 0.3,
-						initialAngle: Math.random() * Math.PI * 2,
+						radiusX: baseRadiusX + radiusIncrement * 0,
+						radiusZ: baseRadiusZ + radiusIncrement * 0 * 0.833,
+						speed: 0.2 + Math.random() * 0.2,
+						initialAngle: 0,
 					},
-					models: ["GPT-4", "Claude", "Gemini", "LLaMA"],
+					logo: AI_LOGOS.chat.gpt4,
+					displayName: "GPT-4",
 					icon: MessageSquare,
 				},
 				{
 					name: "Image AI",
 					color: 0x10b981,
 					orbit: {
-						radiusX: 1.4 * responsiveScale, // Reduced from 2.0
-						radiusZ: 1.1 * responsiveScale, // Reduced from 1.6
-						speed: 0.3 + Math.random() * 0.3,
-						initialAngle: Math.random() * Math.PI * 2,
+						radiusX: baseRadiusX + radiusIncrement * 1,
+						radiusZ: baseRadiusZ + radiusIncrement * 1 * 0.833,
+						speed: 0.2 + Math.random() * 0.2,
+						initialAngle: (Math.PI * 2) / 5,
 					},
-					models: ["DALL-E", "Midjourney", "Stable Diff", "Flux"],
+					logo: AI_LOGOS.chat.gemini,
+					displayName: "Midjourney",
 					icon: Image,
 				},
 				{
 					name: "Audio AI",
 					color: 0x8b5cf6,
 					orbit: {
-						radiusX: 1.1 * responsiveScale, // Reduced from 1.6
-						radiusZ: 0.9 * responsiveScale, // Reduced from 1.3
-						speed: 0.3 + Math.random() * 0.3,
-						initialAngle: Math.random() * Math.PI * 2,
+						radiusX: baseRadiusX + radiusIncrement * 2,
+						radiusZ: baseRadiusZ + radiusIncrement * 2 * 0.833,
+						speed: 0.2 + Math.random() * 0.2,
+						initialAngle: (Math.PI * 4) / 5,
 					},
-					models: ["ElevenLabs", "Whisper", "Suno", "MusicGen"],
+					logo: AI_LOGOS.chat.claude,
+					displayName: "ElevenLabs",
 					icon: Volume2,
 				},
 				{
 					name: "Video AI",
 					color: 0xec4899,
 					orbit: {
-						radiusX: 1.8 * responsiveScale, // Reduced from 2.6
-						radiusZ: 1.5 * responsiveScale, // Reduced from 2.1
-						speed: 0.3 + Math.random() * 0.3,
-						initialAngle: Math.random() * Math.PI * 2,
+						radiusX: baseRadiusX + radiusIncrement * 3,
+						radiusZ: baseRadiusZ + radiusIncrement * 3 * 0.833,
+						speed: 0.2 + Math.random() * 0.2,
+						initialAngle: (Math.PI * 6) / 5,
 					},
-					models: ["Sora", "Runway", "Pika", "Luma"],
+					logo: AI_LOGOS.chat.llama,
+					displayName: "Sora",
 					icon: Video,
 				},
 				{
 					name: "Code AI",
 					color: 0xf59e0b,
 					orbit: {
-						radiusX: 2.2 * responsiveScale, // Reduced from 3.2
-						radiusZ: 1.8 * responsiveScale, // Reduced from 2.6
-						speed: 0.3 + Math.random() * 0.3,
-						initialAngle: Math.random() * Math.PI * 2,
+						radiusX: baseRadiusX + radiusIncrement * 4,
+						radiusZ: baseRadiusZ + radiusIncrement * 4 * 0.833,
+						speed: 0.2 + Math.random() * 0.2,
+						initialAngle: (Math.PI * 8) / 5,
 					},
-					models: ["Copilot", "Cursor", "Cody", "Tabnine"],
+					logo: AI_LOGOS.chat.mistral,
+					displayName: "Copilot",
 					icon: Code,
 				},
 			];
 
-			// ============ EVEN SMALLER CLUSTERS ============
-			aiCategories.forEach((category) => {
-				const clusterGroup = new THREE.Group();
+			const createClustersWithLogos = async () => {
+				// Pre-load all logos
+				const logoLoadPromises: Promise<THREE.Texture>[] = [];
 
-				const angle = category.orbit.initialAngle;
-				const x = category.orbit.radiusX * Math.cos(angle);
-				const z = category.orbit.radiusZ * Math.sin(angle);
-				const y = 0;
-
-				clusterGroup.position.set(x, y, z);
-
-				clusterGroup.userData = {
-					orbit: category.orbit,
-					currentAngle: angle,
-				};
-
-				// ============ MUCH SMALLER CLUSTER SPHERES ============
-				const sphereGeometry = new THREE.SphereGeometry(
-					0.18 * responsiveScale, // Reduced from 0.25
-					34, // Even fewer segments
-					34,
-				);
-				const sphereMaterial = new THREE.MeshBasicMaterial({
-					color: category.color,
-					transparent: true,
-					opacity: 0.8,
-					wireframe: true,
+				aiCategories.forEach((category) => {
+					logoLoadPromises.push(
+						loadLogoTexture(category.logo).catch((error) => {
+							console.warn(`Fallback for ${category.displayName}`, error);
+							return createTextTexture(
+								category.displayName.substring(0, 4),
+								category.color,
+							);
+						}),
+					);
 				});
-				const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-				clusterGroup.add(sphere);
 
-				const innerSphereGeo = new THREE.SphereGeometry(
-					0.09 * responsiveScale, // Reduced from 0.12
-					8,
-					8,
-				);
-				const innerSphereMat = new THREE.MeshBasicMaterial({
-					color: category.color,
-					transparent: true,
-					opacity: 0.5,
+				await Promise.allSettled(logoLoadPromises);
+
+				// Create clusters - LOGO ONLY, NO SPHERES
+				aiCategories.forEach((category, categoryIndex) => {
+					const clusterGroup = new THREE.Group();
+
+					const angle = category.orbit.initialAngle;
+					const x = category.orbit.radiusX * Math.cos(angle);
+					const z = category.orbit.radiusZ * Math.sin(angle);
+					clusterGroup.position.set(x, 0, z);
+
+					clusterGroup.userData = {
+						orbit: category.orbit,
+						currentAngle: angle,
+					};
+
+					// Main Logo
+					const logoTexture = logoTextures.get(category.logo);
+					if (logoTexture) {
+						// Very subtle background glow - same size as logo
+						const glowSprite = createLogoSprite(logoTexture, 0.42, true);
+						glowSprite.position.set(0, 0, -0.01);
+						clusterGroup.add(glowSprite);
+
+						// Main logo with better settings
+						const logoSprite = createLogoSprite(logoTexture, 0.4, false);
+						logoSprite.position.set(0, 0, 0);
+						clusterGroup.add(logoSprite);
+						clusterGroup.userData.mainLogo = logoSprite;
+						clusterGroup.userData.glow = glowSprite;
+					}
+
+					// Colored ring BEHIND and LARGER for separation
+					const ringGeometry = new THREE.RingGeometry(
+						0.24 * responsiveScale,
+						0.28 * responsiveScale,
+						32,
+					);
+					const ringMaterial = new THREE.MeshBasicMaterial({
+						color: category.color,
+						transparent: true,
+						opacity: 0.4,
+						side: THREE.DoubleSide,
+					});
+					const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+					ring.position.set(0, 0, -0.03);
+					ring.renderOrder = 1;
+					clusterGroup.add(ring);
+					clusterGroup.userData.ring = ring;
+
+					// Minimal particles with better colors
+					const particleCount = 8;
+					const positions = new Float32Array(particleCount * 3);
+					const velocities = new Float32Array(particleCount * 3);
+					const colors = new Float32Array(particleCount * 3);
+					const color = new THREE.Color(category.color);
+
+					for (let i = 0; i < particleCount; i++) {
+						const radius = (0.3 + Math.random() * 0.2) * responsiveScale;
+						const theta = Math.random() * Math.PI * 2;
+						const phi = Math.random() * Math.PI;
+
+						positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+						positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+						positions[i * 3 + 2] = radius * Math.cos(phi);
+
+						velocities[i * 3] = (Math.random() - 0.5) * 0.001 * responsiveScale;
+						velocities[i * 3 + 1] =
+							(Math.random() - 0.5) * 0.001 * responsiveScale;
+						velocities[i * 3 + 2] =
+							(Math.random() - 0.5) * 0.001 * responsiveScale;
+
+						colors[i * 3] = color.r;
+						colors[i * 3 + 1] = color.g;
+						colors[i * 3 + 2] = color.b;
+					}
+
+					const particleGeometry = new THREE.BufferGeometry();
+					particleGeometry.setAttribute(
+						"position",
+						new THREE.BufferAttribute(positions, 3),
+					);
+					particleGeometry.setAttribute(
+						"color",
+						new THREE.BufferAttribute(colors, 3),
+					);
+
+					const particleMaterial = new THREE.PointsMaterial({
+						size: 0.006 * responsiveScale,
+						vertexColors: true,
+						transparent: true,
+						opacity: 0.6,
+						blending: THREE.AdditiveBlending,
+						depthWrite: false,
+					});
+
+					const particles = new THREE.Points(
+						particleGeometry,
+						particleMaterial,
+					);
+					particles.userData = { velocities };
+					clusterGroup.add(particles);
+
+					solarSystemGroup.add(clusterGroup);
+
+					aiClusters.push({
+						group: clusterGroup,
+						mainLogo: clusterGroup.userData.mainLogo,
+						glow: clusterGroup.userData.glow,
+						ring: clusterGroup.userData.ring,
+						particles,
+						color: category.color,
+						orbit: category.orbit,
+					});
 				});
-				const innerSphere = new THREE.Mesh(innerSphereGeo, innerSphereMat);
-				clusterGroup.add(innerSphere);
 
-				const glowGeometry = new THREE.SphereGeometry(
-					0.22 * responsiveScale, // Reduced from 0.3
-					12,
-					12,
-				);
-				const glowMaterial = new THREE.MeshBasicMaterial({
-					color: category.color,
-					transparent: true,
-					opacity: 0.4,
+				// Clean orbit paths with better visibility
+				aiClusters.forEach((cluster) => {
+					const orbitGeometry = new THREE.EllipseCurve(
+						0,
+						0,
+						cluster.orbit.radiusX,
+						cluster.orbit.radiusZ,
+						0,
+						2 * Math.PI,
+						false,
+						0,
+					);
+
+					const points = orbitGeometry.getPoints(64);
+					const orbitPoints = points.map(
+						(point) => new THREE.Vector3(point.x, 0, point.y),
+					);
+
+					const curve = new THREE.CatmullRomCurve3(orbitPoints);
+					const tubeGeometry = new THREE.TubeGeometry(
+						curve,
+						64,
+						0.02 * responsiveScale,
+						6,
+						false,
+					);
+
+					const orbitMaterial = new THREE.MeshBasicMaterial({
+						color: cluster.color,
+						transparent: true,
+						opacity: 0.1,
+						side: THREE.DoubleSide,
+						depthWrite: false,
+					});
+
+					const orbitTube = new THREE.Mesh(tubeGeometry, orbitMaterial);
+					orbitTube.renderOrder = -1;
+					solarSystemGroup.add(orbitTube);
 				});
-				const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-				clusterGroup.add(glow);
+			};
 
-				// ============ FEWER PARTICLES ============
-				const particleCount = particleCounts.cluster;
-				const positions = new Float32Array(particleCount * 3);
-				const velocities = new Float32Array(particleCount * 3);
-				const colors = new Float32Array(particleCount * 3);
-				const color = new THREE.Color(category.color);
+			// ============ IMPROVED CENTRAL HUB ============
+			const createCentralHubWithLogo = async () => {
+				centralHub = new THREE.Group();
+				centralHub.position.set(0.03, 0, 0);
 
-				for (let i = 0; i < particleCount; i++) {
-					const radius = (0.6 + Math.random() * 0.9) * responsiveScale; // Smaller particle clouds
-					const theta = Math.random() * Math.PI * 2;
-					const phi = Math.random() * Math.PI;
+				// Large central Queryo logo - BIGGER and CLEARER
+				try {
+					const queryoTexture = await loadLogoTexture(AI_LOGOS.hub);
 
-					positions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-					positions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-					positions[i * 3 + 2] = radius * Math.cos(phi);
+					// Minimal glow - SAME SIZE as main logo
+					const glowSprite = createLogoSprite(queryoTexture, 1.1, true);
+					glowSprite.position.set(0, 0, -0.01);
+					centralHub.add(glowSprite);
 
-					velocities[i * 3] = (Math.random() - 0.5) * 0.006 * responsiveScale;
-					velocities[i * 3 + 1] =
-						(Math.random() - 0.5) * 0.006 * responsiveScale;
-					velocities[i * 3 + 2] =
-						(Math.random() - 0.5) * 0.006 * responsiveScale;
+					// Main logo - LARGER and CRISP
+					const queryoLogo = createLogoSprite(queryoTexture, 1.0, false);
+					queryoLogo.position.set(0, 0, 0);
+					queryoLogo.renderOrder = 100;
+					centralHub.add(queryoLogo);
+					centralHub.userData.logo = queryoLogo;
+					centralHub.userData.glow = glowSprite;
 
-					colors[i * 3] = color.r;
-					colors[i * 3 + 1] = color.g;
-					colors[i * 3 + 2] = color.b;
+					console.log("✅ Central hub logo loaded");
+				} catch (error) {
+					console.warn("⚠️ Using fallback hub logo");
+					const fallbackTexture = createTextTexture("QUERYO", 0xff6b35);
+
+					const glowSprite = createLogoSprite(fallbackTexture, 1.1, true);
+					centralHub.add(glowSprite);
+
+					const fallbackLogo = createLogoSprite(fallbackTexture, 1.0, false);
+					fallbackLogo.renderOrder = 100;
+					centralHub.add(fallbackLogo);
+					centralHub.userData.logo = fallbackLogo;
+					centralHub.userData.glow = glowSprite;
 				}
 
-				const particleGeometry = new THREE.BufferGeometry();
-				particleGeometry.setAttribute(
-					"position",
-					new THREE.BufferAttribute(positions, 3),
-				);
-				particleGeometry.setAttribute(
-					"color",
-					new THREE.BufferAttribute(colors, 3),
-				);
+				solarSystemGroup.add(centralHub);
+			};
 
-				const particleMaterial = new THREE.PointsMaterial({
-					size: 0.015 * responsiveScale, // Smaller particles
-					vertexColors: true,
-					transparent: true,
-					opacity: 0.8,
-					blending: THREE.AdditiveBlending,
-					map: particleTexture,
-					alphaTest: 0.1,
-				});
+			// Await both async functions
+			await createClustersWithLogos();
+			await createCentralHubWithLogo();
 
-				const particles = new THREE.Points(particleGeometry, particleMaterial);
-				particles.userData = { velocities };
-				clusterGroup.add(particles);
-
-				solarSystemGroup.add(clusterGroup);
-
-				aiClusters.push({
-					group: clusterGroup,
-					sphere,
-					innerSphere,
-					glow,
-					particles,
-					color: category.color,
-					orbit: category.orbit,
-					rotationSpeed: 0.002 + Math.random() * 0.003,
-				});
-			});
-
-			// ============ SMALLER ORBIT PATHS ============
-			aiClusters.forEach((cluster) => {
-				const orbitGeometry = new THREE.EllipseCurve(
-					0,
-					0,
-					cluster.orbit.radiusX,
-					cluster.orbit.radiusZ,
-					0,
-					2 * Math.PI,
-					false,
-					0,
-				);
-
-				const points = orbitGeometry.getPoints(80); // Fewer points
-				const orbitPoints = points.map(
-					(point) => new THREE.Vector3(point.x, 0, point.y),
-				);
-
-				// Create a smooth curve from the points
-				const curve = new THREE.CatmullRomCurve3(orbitPoints);
-
-				// Create tube geometry - much thicker than line
-				const tubeGeometry = new THREE.TubeGeometry(
-					curve,
-					80, // tubular segments (smoothness)
-					0.009 * responsiveScale, // tube radius - adjust this for thickness
-					8, // radial segments
-					false, // closed
-				);
-
-				const orbitMaterial = new THREE.MeshBasicMaterial({
-					color: cluster.color,
-					transparent: true,
-					opacity: 0.3, // Higher opacity for solid look
-					side: THREE.DoubleSide,
-				});
-
-				const orbitTube = new THREE.Mesh(tubeGeometry, orbitMaterial);
-				solarSystemGroup.add(orbitTube);
-			});
-
-			// ============ SMALLER CENTRAL HUB ============
-			centralHub = new THREE.Group();
-			centralHub.position.set(0, 0, 0);
-
-			const centralHubScale = getCentralHubScale();
-
-			const hubGeometry = new THREE.SphereGeometry(
-				0.75 * centralHubScale, // Reduced from 1.0
-				64, // Fewer segments
-				64,
-			);
-
-			const hubMaterial = new THREE.MeshBasicMaterial({
-				color: 0xff6b35,
-				transparent: true,
-				opacity: 0.9,
-				wireframe: true,
-			});
-
-			const hubSphere = new THREE.Mesh(hubGeometry, hubMaterial);
-			centralHub.add(hubSphere);
-
-			const hubInnerGeo = new THREE.SphereGeometry(
-				0.95 * centralHubScale, // Reduced from 1.3
-				48,
-				48,
-			);
-			const hubInnerMat = new THREE.MeshBasicMaterial({
-				color: 0xff6b35,
-				transparent: true,
-				opacity: 0.4,
-			});
-			const hubInner = new THREE.Mesh(hubInnerGeo, hubInnerMat);
-			centralHub.add(hubInner);
-
-			const hubGlowGeometry = new THREE.SphereGeometry(
-				0.8 * centralHubScale, // Reduced from 1.1
-				48,
-				48,
-			);
-			const hubGlowMaterial = new THREE.MeshBasicMaterial({
-				color: 0xffa500,
-				transparent: true,
-				opacity: 0.3,
-			});
-			const hubGlow = new THREE.Mesh(hubGlowGeometry, hubGlowMaterial);
-			centralHub.add(hubGlow);
-
-			// ============ SINGLE RING ============
-			const ringCount = 1;
-			for (let i = 0; i < ringCount; i++) {
-				const ringGeometry = new THREE.TorusGeometry(
-					(0.6 + i * 0.3) * centralHubScale, // Smaller rings
-					0.015 * centralHubScale, // Thinner
-					6, // Fewer segments
-					60, // Fewer segments
-				);
-				const ringMaterial = new THREE.MeshBasicMaterial({
-					color: i % 2 === 0 ? 0xffa500 : 0xff6b35,
-					transparent: true,
-					opacity: 0.6,
-				});
-				const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-				ring.rotation.x = Math.PI / 2 + (i * Math.PI) / 6;
-				ring.rotation.y = (i * Math.PI) / 4;
-				ring.userData = { rotationSpeed: 0.001 * (i + 1) };
-				centralHub.add(ring);
-			}
-
-			// ============ REDUCED HUB PARTICLES ============
-			const hubParticleCount = particleCounts.hub;
-			const hubParticlePos = new Float32Array(hubParticleCount * 3);
-			const hubParticleColors = new Float32Array(hubParticleCount * 3);
-
-			for (let i = 0; i < hubParticleCount; i++) {
-				const radius = (0.6 + Math.random() * 0.8) * responsiveScale; // Tighter particle field
-				const theta = Math.random() * Math.PI * 2;
-				const phi = Math.random() * Math.PI;
-
-				hubParticlePos[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
-				hubParticlePos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-				hubParticlePos[i * 3 + 2] = radius * Math.cos(phi);
-
-				const color = new THREE.Color(
-					Math.random() > 0.5 ? 0xff6b35 : 0xffa500,
-				);
-				hubParticleColors[i * 3] = color.r;
-				hubParticleColors[i * 3 + 1] = color.g;
-				hubParticleColors[i * 3 + 2] = color.b;
-			}
-
-			const hubParticleGeo = new THREE.BufferGeometry();
-			hubParticleGeo.setAttribute(
-				"position",
-				new THREE.BufferAttribute(hubParticlePos, 3),
-			);
-			hubParticleGeo.setAttribute(
-				"color",
-				new THREE.BufferAttribute(hubParticleColors, 3),
-			);
-
-			const hubParticleMat = new THREE.PointsMaterial({
-				size: 0.012 * responsiveScale, // Smaller particles
-				vertexColors: true,
-				transparent: true,
-				opacity: 0.7,
-				blending: THREE.AdditiveBlending,
-				map: particleTexture,
-				alphaTest: 0.1,
-			});
-
-			const hubParticles = new THREE.Points(hubParticleGeo, hubParticleMat);
-			centralHub.add(hubParticles);
-			centralHub.userData = { hubParticles };
-
-			solarSystemGroup.add(centralHub);
-
-			// ============ REDUCED AMBIENT PARTICLES ============
+			// Ambient particles
 			const ambientCount = particleCounts.ambient;
 			const ambientPositions = new Float32Array(ambientCount * 3);
 			const ambientColors = new Float32Array(ambientCount * 3);
 			const ambientVelocities = new Float32Array(ambientCount * 3);
 
 			for (let i = 0; i < ambientCount; i++) {
-				ambientPositions[i * 3] = (Math.random() - 0.5) * 9 * responsiveScale; // Smaller area
+				ambientPositions[i * 3] = (Math.random() - 0.5) * 9 * responsiveScale;
 				ambientPositions[i * 3 + 1] =
 					(Math.random() - 0.5) * 9 * responsiveScale;
 				ambientPositions[i * 3 + 2] =
@@ -900,7 +969,7 @@ const MultiLLMHero = ({
 			);
 
 			const ambientMaterial = new THREE.PointsMaterial({
-				size: 0.01 * responsiveScale, // Smaller ambient particles
+				size: 0.01 * responsiveScale,
 				vertexColors: true,
 				transparent: true,
 				opacity: 0.5,
@@ -917,7 +986,7 @@ const MultiLLMHero = ({
 			scene.add(ambientParticles);
 		};
 
-		// ============ ANIMATE FUNCTION ============
+		// Animate function
 		const animate = () => {
 			const time = Date.now() * 0.001;
 
@@ -928,63 +997,89 @@ const MultiLLMHero = ({
 
 				const x = cluster.orbit.radiusX * Math.cos(angle);
 				const z = cluster.orbit.radiusZ * Math.sin(angle);
-				const y = 0;
 
-				cluster.group.position.set(x, y, z);
+				cluster.group.position.set(x, 0, z);
 
-				cluster.particles.rotation.y += cluster.rotationSpeed;
-				cluster.sphere.rotation.y -= cluster.rotationSpeed * 0.5;
-
-				// Update particle positions within cluster
-				const positions = cluster.particles.geometry.attributes.position.array;
-				const velocities = cluster.particles.userData.velocities;
-
-				for (let i = 0; i < positions.length; i += 3) {
-					positions[i] += velocities[i];
-					positions[i + 1] += velocities[i + 1];
-					positions[i + 2] += velocities[i + 2];
-
-					const distance = Math.sqrt(
-						positions[i] ** 2 + positions[i + 1] ** 2 + positions[i + 2] ** 2,
-					);
-
-					if (
-						distance > 1.1 * responsiveScale ||
-						distance < 0.4 * responsiveScale
-					) {
-						velocities[i] *= -1;
-						velocities[i + 1] *= -1;
-						velocities[i + 2] *= -1;
-					}
+				// Make logos always face camera
+				if (cluster.mainLogo) {
+					cluster.mainLogo.quaternion.copy(camera.quaternion);
 				}
-				cluster.particles.geometry.attributes.position.needsUpdate = true;
+				if (cluster.glow) {
+					cluster.glow.quaternion.copy(camera.quaternion);
+				}
 
-				// Subtle pulsing effect
-				const pulse = Math.sin(time * 1.5 + index) * 0.05 + 1;
-				cluster.sphere.scale.setScalar(pulse);
-				cluster.glow.scale.setScalar(pulse * 1.1);
+				// More subtle pulse on main logo
+				if (cluster.mainLogo) {
+					const pulse = Math.sin(time * 2 + index) * 0.03 + 1;
+					cluster.mainLogo.scale.set(
+						0.6 * responsiveScale * pulse,
+						0.6 * responsiveScale * pulse,
+						1,
+					);
+				}
+
+				// Rotate ring
+				if (cluster.ring) {
+					cluster.ring.rotation.z += 0.01;
+				}
+
+				// Update particles
+				if (cluster.particles) {
+					cluster.particles.rotation.y += 0.005;
+
+					const positions =
+						cluster.particles.geometry.attributes.position.array;
+					const velocities = cluster.particles.userData.velocities;
+
+					for (let i = 0; i < positions.length; i += 3) {
+						positions[i] += velocities[i];
+						positions[i + 1] += velocities[i + 1];
+						positions[i + 2] += velocities[i + 2];
+
+						const distance = Math.sqrt(
+							positions[i] ** 2 + positions[i + 1] ** 2 + positions[i + 2] ** 2,
+						);
+
+						if (
+							distance > 0.5 * responsiveScale ||
+							distance < 0.25 * responsiveScale
+						) {
+							velocities[i] *= -1;
+							velocities[i + 1] *= -1;
+							velocities[i + 2] *= -1;
+						}
+					}
+					cluster.particles.geometry.attributes.position.needsUpdate = true;
+				}
 			});
 
 			// Central hub animation
-			centralHub.rotation.y += 0.003;
-			centralHub.rotation.x += 0.001;
+			centralHub.rotation.y += 0.002;
 
-			// Rotate individual rings
-			centralHub.children.forEach((child, i) => {
-				if (i > 2 && child.userData.rotationSpeed) {
-					child.rotation.z +=
-						child.userData.rotationSpeed * (i % 2 === 0 ? 1 : -1);
+			// Make central logo always face camera
+			if (centralHub.userData.logo) {
+				centralHub.userData.logo.quaternion.copy(camera.quaternion);
+			}
+			if (centralHub.userData.glow) {
+				centralHub.userData.glow.quaternion.copy(camera.quaternion);
+			}
+
+			// Rotate ring
+			centralHub.children.forEach((child) => {
+				if (child.userData.rotationSpeed) {
+					child.rotation.z += child.userData.rotationSpeed;
 				}
 			});
 
-			// Hub particle rotation
-			if (centralHub.userData.hubParticles) {
-				centralHub.userData.hubParticles.rotation.y += 0.001;
+			// Very gentle pulse on central logo
+			const hubPulse = Math.sin(time * 1.5) * 0.015 + 1;
+			if (centralHub.userData.logo) {
+				centralHub.userData.logo.scale.set(
+					1.2 * getCentralHubScale() * hubPulse,
+					1.2 * getCentralHubScale() * hubPulse,
+					1,
+				);
 			}
-
-			// Very subtle hub pulse
-			const hubPulse = Math.sin(time) * 0.03 + 1;
-			centralHub.scale.setScalar(hubPulse);
 
 			// Animate ambient particles
 			scene.children.forEach((child) => {
@@ -1008,9 +1103,7 @@ const MultiLLMHero = ({
 				}
 			});
 
-			// Camera remains fixed
 			camera.lookAt(0, 0, 0);
-
 			renderer.render(scene, camera);
 			animationFrameId = requestAnimationFrame(animate);
 		};
@@ -1029,9 +1122,15 @@ const MultiLLMHero = ({
 
 		window.addEventListener("resize", handleResize);
 
+		// Call async init and handle it properly
 		try {
-			init();
-			animate();
+			init()
+				.then(() => {
+					animate();
+				})
+				.catch((error) => {
+					console.error("Three.js initialization error:", error);
+				});
 		} catch (error) {
 			console.error("Three.js error:", error);
 		}
@@ -1039,11 +1138,14 @@ const MultiLLMHero = ({
 		return () => {
 			window.removeEventListener("resize", handleResize);
 			if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+			// Dispose textures
+			logoTextures.forEach((texture) => texture.dispose());
+			logoTextures.clear();
+
 			if (renderer) renderer.dispose();
 		};
 	}, [isLoading]);
-
-	
 
 	return (
 		<div className="grain">

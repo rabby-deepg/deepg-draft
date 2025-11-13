@@ -1,0 +1,59 @@
+<svg
+    width="140"
+    height="40"
+    viewBox="0 0 350 100"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+>
+  <!-- Four overlapping circles representing different media types -->
+  <!-- They merge into a unified shape -->
+
+  <!-- Top circle - slightly transparent -->
+  <circle cx="50" cy="35" r="18" fill="#FFB84D" opacity="0.85" />
+
+  <!-- Left circle -->
+  <circle cx="35" cy="52" r="18" fill="#FF8533" opacity="0.85" />
+
+  <!-- Right circle -->
+  <circle cx="65" cy="52" r="18" fill="#FF6B1A" opacity="0.85" />
+
+  <!-- Bottom circle -->
+  <circle cx="50" cy="65" r="18" fill="#FF5500" opacity="0.85" />
+
+  <!-- Central highlight where all overlap - represents unified experience -->
+  <circle cx="50" cy="50" r="8" fill="#FFFFFF" opacity="0.9" />
+
+  <!-- Q tail extending from the unified center -->
+  <line
+    x1="56"
+    y1="56"
+    x2="70"
+    y2="75"
+    stroke="#FF6B1A"
+    stroke-width="6"
+    stroke-linecap="round"
+  />
+
+  <!-- Queryo text -->
+  <text
+    x="95"
+    y="72"
+    font-family="system-ui, -apple-system, sans-serif"
+    font-size="52"
+    font-weight="700"
+    fill="#2d2d2d"
+    letter-spacing="-1"
+  >
+    Queryo
+  </text>
+
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+      <feMerge>
+        <feMergeNode in="coloredBlur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+</svg>
